@@ -1,0 +1,6 @@
+interface:
+  display_name: "SCO Control"
+  short_description: "Operate SCO jobs, containers, storage, and images"
+  default_prompt: "Use $sco-control to submit or inspect SenseCore SCO ACP/CCI jobs and related AEC2, AFS, and CCR resources."
+policy:
+  allow_implicit_invocation: true
