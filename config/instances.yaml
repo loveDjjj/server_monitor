@@ -1,0 +1,119 @@
+# 配置格式版本。
+version: 2
+# 定时任务时区。
+timezone: Asia/Shanghai
+# 实例状态采样间隔（秒）；与GPU监控独立。
+status_interval_seconds: 60
+# 受管实例列表；可从网页添加，新增默认只监控。
+instances:
+# 本地唯一标识，也是状态和日志目录名称。
+- key: h100
+  # 平台资源名称，不是显示名称。
+  name: oneday-keeper-h100
+  # 管理台显示名称。
+  display_name: OneDay-Keeper-H100
+  # 工作空间名称，与应用name共同定位已有CCI。
+  workspace: share-space
+  # 计算集群名称。
+  cluster: debug-cluster
+  # 实例资源信息；必须与平台规格对应。
+  resources:
+    # 平台资源规格名称。
+    spec: n6ls.iu.i40.2.8c128g
+    # GPU卡数，CPU实例可为0。
+    gpu_count: 2
+    # vCPU数量。
+    cpu: '8'
+    # 内存容量，带单位，例如128GiB。
+    memory: 128GiB
+  # 完整镜像地址；实例编辑保存后下一次启动应用。
+  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-09-21:oneday-container-20260921060318
+  # 每日定时；停止时段优先于周期续杯。
+  schedule:
+    # 每日启动规则。
+    start:
+      # 是否启用当前功能。
+      enabled: true
+      # 每日执行时间，24小时HH:MM格式。
+      time: 09:00
+    # 每日停止规则。
+    stop:
+      # 是否启用当前功能。
+      enabled: true
+      # 每日执行时间，24小时HH:MM格式。
+      time: 00:00
+  # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
+  rollover:
+    # 是否启用当前功能。
+    enabled: true
+    # 续杯周期（1–230分钟）；修改后按本轮平台启动时间立即重新判断。
+    period_minutes: 54
+  # 公网映射管理；普通启停保留绑定。
+  dnat:
+    # 是否启用当前功能。
+    enabled: true
+    # EIP资源名称。
+    eip_name: eip-zhicheng-cd005511
+    # 公网IP。
+    external_ip: 118.145.32.163
+    # 候选公网端口，按顺序选择未占用端口。
+    external_port_candidates:
+    - 11081
+    - 10081
+    # 目标容器服务端口。
+    internal_port: 22
+    # 转发协议。
+    protocol: tcp
+    # 本实例管理的DNAT规则前缀，应独立设置。
+    rule_prefix: dnat-oneday-h100
+    # 明确允许复用的规则白名单，避免影响其他实例。
+    reusable_rule_names:
+    - dnat-zhicheng-e65208ef
+    # CCI应用必须使用CCI_DEPLOYMENT_SERVICE。
+    internal_instance_type: CCI_DEPLOYMENT_SERVICE
+# 本地唯一标识，也是状态和日志目录名称。
+- key: cci-347dfc645205
+  # 平台资源名称，不是显示名称。
+  name: oneday-debug-h100
+  # 工作空间名称，与应用name共同定位已有CCI。
+  workspace: share-space
+  # 管理台显示名称。
+  display_name: OneDay-debug-H100
+  # 计算集群名称。
+  cluster: debug-cluster
+  # 实例资源信息；必须与平台规格对应。
+  resources:
+    # 平台资源规格名称。
+    spec: n6ls.iu.i40.1.4c64g
+    # GPU卡数，CPU实例可为0。
+    gpu_count: 1
+    # vCPU数量。
+    cpu: '4'
+    # 内存容量，带单位，例如128GiB。
+    memory: 64GiB
+  # 完整镜像地址；实例编辑保存后下一次启动应用。
+  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-09-21:oneday-container-20260921060318
+  # 每日定时；停止时段优先于周期续杯。
+  schedule:
+    # 每日启动规则。
+    start:
+      # 是否启用当前功能。
+      enabled: false
+      # 每日执行时间，24小时HH:MM格式。
+      time: 09:00
+    # 每日停止规则。
+    stop:
+      # 是否启用当前功能。
+      enabled: false
+      # 每日执行时间，24小时HH:MM格式。
+      time: 00:00
+  # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
+  rollover:
+    # 是否启用当前功能。
+    enabled: true
+    # 续杯周期（1–230分钟）；修改后按本轮平台启动时间立即重新判断。
+    period_minutes: 230
+  # 公网映射管理；普通启停保留绑定。
+  dnat:
+    # 是否启用当前功能。
+    enabled: false

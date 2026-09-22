@@ -133,6 +133,8 @@ For task-switching guidance, read [run_sco_pattern.md](references/run_sco_patter
 
 ## Reference Loading
 
+- 管理本仓库的多实例控制台时，先阅读 [manager.md](references/manager.md)，了解平台运行时间、DNAT类型与失败恢复语义。
+
 - Read [acp.md](references/acp.md) for ACP create/list/log/exec details or command flags.
 - Read [cci.md](references/cci.md) for CCI YAML structure and container-app management.
 - Read [aec2-afs.md](references/aec2-afs.md) for workerspec, cluster lookup, storage mount, quota, and ACL patterns.

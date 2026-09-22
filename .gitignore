@@ -1,3 +1,12 @@
-run_sco.sh
-sensecore_cli_docs/
-sensecore_cli_docs.tar.gz
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+.env.*
+*.local.plist
+runtime/*
+!runtime/.gitkeep
+logs/*
+!logs/.gitkeep

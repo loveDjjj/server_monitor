@@ -1,0 +1,95 @@
+# 配置格式版本。
+version: 1
+# SCO访问上下文；使用本机已认证的Profile，不填写密钥正文。
+sco:
+  # SCO可执行文件；换机器时修改绝对路径或使用PATH中的sco。
+  executable: /Users/oneday/.sco/bin/sco
+  # 本机SCO配置名称，需要先执行sco init。
+  profile: default
+  # 工作空间名称，与应用name共同定位已有CCI。
+  workspace: share-space
+  # 订阅标识，按目标环境填写。
+  subscription: 0197ee17-b6eb-7846-b2b4-a77c5f509b92
+  # 资源组名称。
+  resource_group: default
+  # 可用区代码。
+  zone: cn-sh-01g
+# 共用容器配置，仅在镜像变更替换实例时使用。
+container:
+  # 平台资源名称，不是显示名称。
+  name: oneday-container
+  # 完整镜像地址；实例编辑保存后下一次启动应用。
+  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-09-21:oneday-container-20260921060318
+  # 启动命令参数列表；原部署保留sleep 4h。
+  command:
+  - bash
+  - -c
+  - 'set -euo pipefail
+
+    bash /data/260010081/ssh-start.sh --prepare-only
+
+    service ssh restart
+
+    echo "[keeper] SSH service started; keeping the container alive for 4 hours"
+
+    sleep 4h
+
+    '
+# 默认挂载配置：AFS存储卷或Secret引用，不填写Secret正文。
+storage:
+# 资源类型，例如PV_AFS或SECRET。
+- type: PV_AFS
+  # 平台资源ID。
+  id: 01a04263-91e5-7603-bc01-c67e503da6b5
+  # 平台资源名称，不是显示名称。
+  name: volume-356d06e80041936a
+  # 容器内挂载路径。
+  mount_path: /data
+  # 卷内子目录，/表示根目录。
+  subdir: /
+  # 可用区代码。
+  zone: cn-sh-01g
+  # 管理台显示名称。
+  display_name: volume-356d06e80041936a
+# 资源类型，例如PV_AFS或SECRET。
+- type: SECRET
+  # 平台资源名称，不是显示名称。
+  name: oneday-mac
+  # 容器内挂载路径。
+  mount_path: /root/.ssh/oneday
+# 创建替换实例时使用的默认设置。
+cci:
+  # 期望实例副本数。
+  replicas: 1
+  # 调度优先级。
+  priority: NORMAL
+  # 配额类型，默认RESERVED。
+  quota_type: RESERVED
+  # 副本亲和策略。
+  instance_affinity: POD_AFFINITY_TYPE_UNSPECIFIED
+  # 应用服务暴露端口。
+  application_ports:
+  - 22
+# 公网映射管理；普通启停保留绑定。
+dnat:
+  # 是否启用当前功能。
+  enabled: true
+  # EIP资源名称。
+  eip_name: eip-zhicheng-cd005511
+  # 公网IP。
+  external_ip: 118.145.32.163
+  # 候选公网端口，按顺序选择未占用端口。
+  external_port_candidates:
+  - 11081
+  - 10081
+  # 目标容器服务端口。
+  internal_port: 22
+  # 转发协议。
+  protocol: tcp
+  # 本实例管理的DNAT规则前缀，应独立设置。
+  rule_prefix: dnat-oneday-h100
+  # 明确允许复用的规则白名单，避免影响其他实例。
+  reusable_rule_names:
+  - dnat-zhicheng-e65208ef
+  # CCI应用必须使用CCI_DEPLOYMENT_SERVICE。
+  internal_instance_type: CCI_DEPLOYMENT_SERVICE
