@@ -12,6 +12,6 @@ class CommentTests(unittest.TestCase):
             path=Path(folder)/'instances.yaml'
             write_yaml(path,value)
             self.assertEqual(read_yaml(path),value)
-            self.assertIn('续杯周期',path.read_text())
+            self.assertIn('续杯周期',path.read_text(encoding='utf-8'))
             write_yaml(path,read_yaml(path))
-            self.assertIn('每日执行时间',path.read_text())
+            self.assertIn('每日执行时间',path.read_text(encoding='utf-8'))

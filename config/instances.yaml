@@ -3,7 +3,7 @@ version: 2
 # 定时任务时区。
 timezone: Asia/Shanghai
 # 实例状态采样间隔（秒）；与GPU监控独立。
-status_interval_seconds: 60
+status_interval_seconds: 30
 # 受管实例列表；可从网页添加，新增默认只监控。
 instances:
 # 本地唯一标识，也是状态和日志目录名称。
@@ -39,15 +39,15 @@ instances:
     # 每日停止规则。
     stop:
       # 是否启用当前功能。
-      enabled: true
+      enabled: false
       # 每日执行时间，24小时HH:MM格式。
       time: 00:00
   # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
   rollover:
     # 是否启用当前功能。
-    enabled: true
+    enabled: false
     # 续杯周期（1–230分钟）；修改后按本轮平台启动时间立即重新判断。
-    period_minutes: 54
+    period_minutes: 230
   # 公网映射管理；普通启停保留绑定。
   dnat:
     # 是否启用当前功能。

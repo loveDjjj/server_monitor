@@ -51,7 +51,7 @@ logs/                         操作和事件日志（不提交）
 
 ## 安装与启动
 
-支持Python 3.10及以上；当前进程锁使用Unix的 `fcntl`，适用于macOS/Linux。
+支持Python 3.10及以上；进程锁兼容Windows、macOS和Linux。
 
 ```bash
 python3 -m venv .venv
@@ -66,6 +66,25 @@ sco init
 # 演练模式，仅查询平台，变更命令不执行
 .venv/bin/python app.py --dry-run --port 18766
 ```
+
+Windows PowerShell可使用Conda环境：
+
+```powershell
+conda create -n oneday python=3.12 pip -y
+conda activate oneday
+python -m pip install -r requirements.txt
+sco version
+sco doctor
+# 未认证时交互输入Access Key；不要把密钥写入仓库。
+sco init --profile default
+
+# 正常模式会执行配置中启用的调度；首次验证建议先使用演练模式。
+python app.py --dry-run --host 127.0.0.1 --port 18766
+python app.py --host 127.0.0.1 --port 18766
+```
+
+若PowerShell尚不能识别 `conda activate`，先执行 `conda init powershell` 并重新打开终端。SCO默认安装到
+`$HOME\.sco\bin\sco.exe`；安装器需要将该目录加入用户 `PATH`，项目配置也可直接填写其绝对路径。
 
 同一个数据目录只允许运行一个管理进程。先停止后台服务再前台运行。`--root /path/to/project` 可指定完整配置、页面与数据目录；仅换端口不意味着隔离数据。
 

@@ -5,7 +5,7 @@ enabled: true
 # GPU余量采样间隔（秒），不影响实例调度。
 interval_seconds: 10
 # GPU历史数据保留时长（小时）。
-history_hours: 8
+history_hours: 24
 # 只读监控的集群列表。
 clusters:
 # 本地唯一标识，也是状态和日志目录名称。

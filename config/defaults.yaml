@@ -3,7 +3,7 @@ version: 1
 # SCO访问上下文；使用本机已认证的Profile，不填写密钥正文。
 sco:
   # SCO可执行文件；换机器时修改绝对路径或使用PATH中的sco。
-  executable: /Users/oneday/.sco/bin/sco
+  executable: C:\Users\260010081\.sco\bin\sco.exe
   # 本机SCO配置名称，需要先执行sco init。
   profile: default
   # 工作空间名称，与应用name共同定位已有CCI。

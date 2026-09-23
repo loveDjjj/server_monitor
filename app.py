@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Single entrypoint for the local multi-instance CCI console."""
 import argparse
-import fcntl
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from controller.http import Handler
+from controller.process_lock import acquire_process_lock
 from controller.service import Service
 from sco_client import configure_logging
 
@@ -17,8 +17,10 @@ def main():
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
     args.root.joinpath('runtime').mkdir(parents=True, exist_ok=True)
-    lock = args.root.joinpath('runtime/manager.lock').open('a')
-    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        lock = acquire_process_lock(args.root.joinpath('runtime/manager.lock'))
+    except OSError as exc:
+        raise SystemExit('同一数据目录已有管理进程在运行') from exc
     configure_logging()
     # Bind before starting collectors: a duplicate process must not mutate resources.
     server = ThreadingHTTPServer((args.host, args.port), Handler)

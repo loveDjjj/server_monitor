@@ -9,6 +9,7 @@ import os
 import shlex
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -25,6 +26,10 @@ DEFAULT_LOG_FILE = ROOT / "logs" / "manager.log"
 RUNNING_STATES = {"RUNNING"}
 STARTING_STATES = {"CREATING", "SCHEDULED", "PROGRESSING", "STARTING"}
 STOPPED_STATES = {"SUSPENDED", "STOPPED"}
+
+# The Windows SCO launcher updates shared entrypoint and runtime-state files.
+# Serialize invocations so instance and GPU monitor threads cannot race there.
+SCO_COMMAND_LOCK = threading.Lock()
 
 
 class KeeperError(RuntimeError):
@@ -122,14 +127,15 @@ class Runner:
             logging.info("DRY-RUN %s", shlex.join(command))
             return CommandResult(command, 0, "")
         logging.debug("RUN %s", shlex.join(command))
-        completed = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=self.timeout,
-            check=False,
-        )
+        with SCO_COMMAND_LOCK:
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=self.timeout,
+                check=False,
+            )
         result = CommandResult(command, completed.returncode, completed.stdout)
         if check and result.returncode != 0:
             raise CommandError(command, result.returncode, result.stdout)
