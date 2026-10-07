@@ -16,7 +16,7 @@ sco acp jobs create --workspace-name "$WORKSPACE" --aec2-name "$AEC2" --job-name
   --command "$COMMAND"
 ```
 
-Required: `--workspace-name`, `--aec2-name`, `--job-name`, `--container-image-url`, `--training-framework`, `--worker-nodes`, `--worker-spec`, `--command`.
+CLI-required: `--workspace-name`, `--aec2-name`, `--job-name`, `--container-image-url`, `--training-framework`, `--worker-spec`. The CLI defaults to one worker node and `--command="sleep inf"`; for actual training always pass an explicit real workload via `--command` instead of relying on that default.
 
 Useful optional flags: `--priority normal|high|highest`, `--storage-mount volume_id[:subdir]:path`, `--env key:value,...`, `--follow`, `--quota-type spot|reserved`, `--enable-fault-tolerance`, `--retry-times`.
 
@@ -39,7 +39,9 @@ sco acp jobs start --workspace-name "$WORKSPACE" "$JOB_ID"
 sco acp jobs delete --workspace-name "$WORKSPACE" "$JOB_ID"
 ```
 
-Use `describe` to find worker names before `exec` or worker-specific logs.
+`create` returns a platform job name such as `pt-xxxxxxxx`; use that name (not the display name or UID) for `describe`, `get-workers`, and `stream-logs`. Use `get-workers` to find the complete worker name before `exec` or worker-specific logs. Submission alone does not establish that a worker is running.
+
+When operating within this repository, read `docs/acp-training.md` for the tested AFS mount, Conda initialization, PowerShell quoting workaround, and current-environment checks before submitting.
 
 Some SCO component builds do not accept server-side `--user-name` or `--state` filters for `jobs list`. When a filter is unavailable, list first and filter client-side:
 

@@ -45,7 +45,7 @@ instances:
   # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
   rollover:
     # 是否启用当前功能。
-    enabled: false
+    enabled: true
     # 续杯周期（1–230分钟）；修改后按本轮平台启动时间立即重新判断。
     period_minutes: 230
   # 公网映射管理；普通启停保留绑定。

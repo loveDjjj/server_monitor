@@ -38,6 +38,7 @@ config/
   instances.yaml               当前实例列表及各实例调度设置
   gpu-monitor.yaml             GPU采样配置
 sco-skill/sco-control/         供AI安装的Skill及命令参考
+docs/acp-training.md           ACP训练任务的AI接手、提交和监控手册
 templates/console.html         单页网页结构
 static/console.js              实例卡片、编辑、日志抽屉、GPU图表
 static/console.css             桌面与手机样式
@@ -87,6 +88,8 @@ python app.py --host 127.0.0.1 --port 18766
 `$HOME\.sco\bin\sco.exe`；安装器需要将该目录加入用户 `PATH`，项目配置也可直接填写其绝对路径。
 
 同一个数据目录只允许运行一个管理进程。先停止后台服务再前台运行。`--root /path/to/project` 可指定完整配置、页面与数据目录；仅换端口不意味着隔离数据。
+
+ACP训练任务的已验证挂载、Conda激活和PowerShell提交步骤见 [ACP训练任务手册](docs/acp-training.md)。ACP与本管理台的CCI调度相互独立。
 
 ## 网页使用
 
@@ -150,7 +153,7 @@ launchctl kickstart -k gui/$(id -u)/com.sco.cci-manager
 launchctl bootout gui/$(id -u)/com.sco.cci-manager
 ```
 
-现有开发机沿用已安装的标签 `com.oneday.sco-cci-manager`，管理它时将命令中的标签替换为该值。不要同时加载两个标签管理同一目录。停止本地服务不会停止云端CCI。Mac睡眠、关机或退出登录期间无法准时调度。
+原macOS部署沿用标签 `com.oneday.sco-cci-manager`，管理它时将命令中的标签替换为该值。Windows不使用launchd。不要同时加载两个标签管理同一目录；重载前确认没有执行中的操作。停止本地服务不会停止云端CCI。Mac睡眠、关机或退出登录期间无法准时调度。
 
 ## API与测试
 

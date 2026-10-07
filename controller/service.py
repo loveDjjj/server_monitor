@@ -1,5 +1,6 @@
 """Multi-instance service with separate cluster monitoring threads."""
 import copy
+import logging
 import threading
 import time
 import json
@@ -169,6 +170,7 @@ class Service:
     def gpu_loop(self, cluster):
         runner = Runner(True, 40)
         next_sample = 0
+        next_prune = 0
         generation = getattr(self, 'gpu_generation', 0)
         while not self.stop_event.wait(1):
             if generation != getattr(self, 'gpu_generation', 0):
@@ -186,8 +188,17 @@ class Service:
             except Exception as exc:
                 sample['error'] = str(exc)
             self.gpu_latest[cluster['key']] = sample
-            append(self.root / 'runtime/gpu' / cluster['key'] / 'metrics.jsonl', sample)
-            prune(self.root / 'runtime/gpu' / cluster['key'] / 'metrics.jsonl', time.time() - self.gpu_config['history_hours'] * 3600)
+            path = self.root / 'runtime/gpu' / cluster['key'] / 'metrics.jsonl'
+            try:
+                append(path, sample)
+            except OSError as exc:
+                logging.warning('GPU history append failed for %s: %s', cluster['key'], exc)
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + 60
+                try:
+                    prune(path, time.time() - self.gpu_config['history_hours'] * 3600)
+                except OSError as exc:
+                    logging.warning('GPU history prune failed for %s: %s', cluster['key'], exc)
             next_sample = time.monotonic() + interval
 
     def metrics(self, key, hours=8):

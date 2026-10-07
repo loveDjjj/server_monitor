@@ -14,20 +14,15 @@ The bundled references are intentionally small. They capture practical command p
 
 ## Installation
 
-Install the skill by copying or linking the `sco-control` directory into your Codex skills directory.
+Install the skill by copying the `sco-control` directory into your Codex skills directory. From the repository root, follow the copy-and-check instructions in `README.md`; do not replace an existing installation without comparing it first.
 
 Copy:
 
 ```bash
 mkdir -p ~/.codex/skills
-cp -R sco-control ~/.codex/skills/sco-control
-```
-
-Symlink for local development:
-
-```bash
-mkdir -p ~/.codex/skills
-ln -s "$(pwd)/sco-control" ~/.codex/skills/sco-control
+ls -ld ~/.codex/skills/sco-control
+# Only if the target does not already exist:
+cp -R sco-skill/sco-control ~/.codex/skills/sco-control
 ```
 
 Restart Codex or reload skills if your client requires it. Invoke explicitly with:
@@ -75,6 +70,7 @@ sco-control/
     ├── aec2-afs.md
     ├── cci.md
     ├── images.md
+    ├── manager.md
     └── run_sco_pattern.md
 ```
 

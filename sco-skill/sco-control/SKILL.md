@@ -14,6 +14,7 @@ Use this skill to operate `sco` pragmatically from shell templates and known com
 - Prefer `-o json` or `-o yaml` when a command supports it and the next step needs parsing.
 - Do not assume a single-user workspace. ACP `jobs list` can return other users' jobs; filter client-side by the runtime user id or by job display-name patterns.
 - Keep secrets out of chat and committed files. If a template includes credentials, leave them as environment variables and do not echo them back.
+- When submitting ACP jobs for this repository, read `docs/acp-training.md` from the repository root first. Always pass a real training command: the CLI's omitted-command default is `sleep inf`.
 - In controlled/sandboxed environments, build commands and files first; skip live `sco` tests unless the user asks.
 
 ## Priority Workflow
