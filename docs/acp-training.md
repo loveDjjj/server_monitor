@@ -1,5 +1,13 @@
 # ACP 训练任务：AI 提交手册
 
+## 2026-10-30 工作台接入
+
+ACP 页面已支持独立监控、人工创建/停止、每日定时和结束后创建新任务。默认规格为 `N6lS.Iu.I10.4.56c792g`（4卡、56核、792GiB），启动入口为 `bash /data/260010081/ops/acp-start.sh --hours 30`。该入口是SSH初始化及有限时长GPU负载，不是真实训练入口。配置位于 `config/acp.yaml`，初始自动化关闭。
+
+`/data/260010081/start_gpu_test_load.sh`、`ssh-start.sh` 和 `conda-env.sh` 已迁移或删除。当前终端初始化位于 `ops/terminal/conda.sh`。下面10月7日的验证记录属于历史记录，旧路径不可直接用于新提交。恢复历史任务之前必须核对其保存的启动命令。
+
+Pod IP 从 `sco acp jobs get-workers` 获取；当前CLI实测不接受 `-o json`，管理台校验并解析表格中的IP。历史地址不代表当前可连接。任务提交超时或结果不明确时应先按已记录显示名查询平台，不能重复点击创建；本地状态在 `runtime/acp/state.json`，不能随意清空pending来绕过重复提交防护。
+
 本文记录 2026-10-07 在 `share-cluster` 实测成功的 ACP 启动方法。下次可直接对 AI 说：
 
 > 阅读 `docs/acp-training.md`、`AGENTS.md` 和当前 `config/defaults.yaml`，用 SCO skill 提交 ACP 训练。训练入口是 `<实际脚本及参数>`，预计运行 `<时长>`；提交后检查 Worker、GPU 和训练日志，告诉我平台任务名和状态。
@@ -93,4 +101,4 @@ $job = 'pt-xxxxxxxx'  # 替换为 create 返回的平台任务名
 & $sco acp jobs describe --workspace-name share-space -o json $job
 ```
 
-`SUCCEEDED` 表示程序正常退出，`FAILED` 应结合容器日志排查；它们都不是仍在占卡的任务。本仓库 CCI 管理台目前**不负责 ACP 自动续跑**，ACP 由 SCO CLI 和平台状态独立管理。AI 完成后要回报平台任务名、镜像/环境、规格及配额、Worker 状态、训练证据，以及任务是否仍在运行。
+`SUCCEEDED` 表示程序正常退出，`FAILED` 应结合容器日志排查；它们都不是仍在占卡的任务。ACP工作台可按独立配置创建下一次工作环境，不会恢复训练进度。AI 完成后要回报平台任务名、镜像/环境、规格及配额、Worker 状态、训练证据，以及任务是否仍在运行。

@@ -1,10 +1,12 @@
+import sys
+import tempfile
 import threading
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from sco_client import KeeperError, Runner, parse_reserved_idle_gpus
-
+from sco_client import SCO_COMMAND_LOCK, KeeperError, Runner, parse_reserved_idle_gpus
 
 USAGE_OUTPUT = """
 +-----------------+----------------+---------------+---------------+------------+-----------+-----------+
@@ -25,6 +27,34 @@ class CapacityParsingTests(unittest.TestCase):
 
 
 class RunnerConcurrencyTests(unittest.TestCase):
+    def test_log_snapshot_returns_partial_utf8_and_truncates(self):
+        result = Runner(True, 0.5).capture(
+            [sys.executable, "-u", "-c", "import time; print('ready', flush=True); time.sleep(30)"],
+            max_bytes=100,
+        )
+        self.assertTrue(result["partial"])
+        self.assertIn("ready", result["text"])
+        result = Runner(True, 3).capture([sys.executable, "-c", "print('a'*1000)"], max_bytes=20)
+        self.assertTrue(result["partial"])
+        self.assertLessEqual(len(result["text"]), 20)
+
+    def test_logs_never_queue_behind_lifecycle_command(self):
+        with SCO_COMMAND_LOCK, patch("sco_client.subprocess.Popen") as spawn:
+            with self.assertRaises(KeeperError):
+                Runner(True, 3).capture(["unused"])
+            spawn.assert_not_called()
+
+    def test_timed_out_log_reader_kills_descendants(self):
+        with tempfile.TemporaryDirectory() as folder:
+            marker = Path(folder) / "child-survived"
+            child = f"import time,pathlib; time.sleep(2); pathlib.Path({str(marker)!r}).touch(); time.sleep(30)"
+            parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',{child!r}]); print('spawned',flush=True); time.sleep(30)"
+            result = Runner(True, 0.7).capture([sys.executable, "-u", "-c", parent])
+            self.assertTrue(result["partial"])
+            self.assertIn("spawned", result["text"])
+            time.sleep(2.1)
+            self.assertFalse(marker.exists())
+
     def test_sco_commands_are_serialized_across_runner_instances(self):
         active = 0
         maximum_active = 0

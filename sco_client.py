@@ -7,25 +7,20 @@ import json
 import logging
 import os
 import shlex
+import signal
 import subprocess
 import sys
+import tempfile
 import threading
-import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parent
 DEFAULT_LOG_FILE = ROOT / "logs" / "manager.log"
-
-RUNNING_STATES = {"RUNNING"}
-STARTING_STATES = {"CREATING", "SCHEDULED", "PROGRESSING", "STARTING"}
-STOPPED_STATES = {"SUSPENDED", "STOPPED"}
 
 # The Windows SCO launcher updates shared entrypoint and runtime-state files.
 # Serialize invocations so instance and GPU monitor threads cannot race there.
@@ -61,14 +56,6 @@ class AppStatus:
     raw: dict[str, Any] | None = None
 
 
-def load_yaml(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise KeeperError(f"configuration must be a mapping: {path}")
-    return data
-
-
 def parse_reserved_idle_gpus(output: str) -> int:
     for line in output.splitlines():
         if "GPU_NUMBER" not in line:
@@ -81,33 +68,6 @@ def parse_reserved_idle_gpus(output: str) -> int:
         except ValueError as exc:
             raise KeeperError(f"invalid RESERVED IDLE GPU value in line: {line}") from exc
     raise KeeperError("GPU_NUMBER row not found in AEC2 usage output")
-
-
-class StateStore:
-    def __init__(self, path: Path):
-        self.path = path
-        self.data: dict[str, Any] = {}
-
-    def load(self) -> dict[str, Any]:
-        if self.path.exists():
-            with self.path.open("r", encoding="utf-8") as handle:
-                self.data = json.load(handle)
-        else:
-            self.data = {}
-        return self.data
-
-    def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(".tmp")
-        with temporary.open("w", encoding="utf-8") as handle:
-            json.dump(self.data, handle, ensure_ascii=True, indent=2, sort_keys=True)
-            handle.write("\n")
-        os.replace(temporary, self.path)
-
-    def update(self, **values: Any) -> None:
-        self.data.update(values)
-        self.data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        self.save()
 
 
 class Runner:
@@ -133,6 +93,8 @@ class Runner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -141,22 +103,64 @@ class Runner:
             raise CommandError(command, result.returncode, result.stdout)
         return result
 
+    def capture(self, argv: Sequence[str], max_bytes: int = 60000) -> dict:
+        """Take a bounded log snapshot; never wait behind lifecycle commands."""
+        command = [str(item) for item in argv]
+        if not SCO_COMMAND_LOCK.acquire(blocking=False):
+            raise KeeperError("平台命令执行中，请稍后读取日志")
+        try:
+            with tempfile.TemporaryFile() as output:
+                process = subprocess.Popen(
+                    command,
+                    stdout=output,
+                    stderr=subprocess.STDOUT,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=os.name != "nt",
+                )
+                timed_out = False
+                try:
+                    process.wait(timeout=self.timeout)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    if os.name == "nt":
+                        # The Windows CLI launcher creates a child process. Kill the
+                        # whole tree so a timed-out reader cannot outlive its request.
+                        subprocess.run(
+                            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5,
+                            check=False,
+                        )
+                    else:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=5)
+                output.seek(0, os.SEEK_END)
+                size = output.tell()
+                output.seek(max(0, size - max_bytes))
+                text = output.read(max_bytes).decode("utf-8", errors="replace")
+                if not timed_out and process.returncode:
+                    raise CommandError(command, process.returncode, text)
+                return {"text": text, "partial": timed_out or size > max_bytes}
+        finally:
+            SCO_COMMAND_LOCK.release()
+
 
 class SCOClient:
     def __init__(
         self,
         base_config: dict[str, Any],
         instance_config: dict[str, Any],
-        state: StateStore,
         rendered_path: Path,
         dry_run_override: bool | None = None,
     ):
         self.base = base_config
         self.task = instance_config
-        self.state = state
         configured_dry_run = bool(instance_config["controller"].get("dry_run", True))
         dry_run = configured_dry_run if dry_run_override is None else dry_run_override
-        self.runner = Runner(dry_run, int(instance_config["controller"].get("command_timeout_seconds", 60)))
+        self.runner = Runner(
+            dry_run, int(instance_config["controller"].get("command_timeout_seconds", 60))
+        )
         self.rendered_path = rendered_path
         self._validate()
 
@@ -164,7 +168,7 @@ class SCOClient:
         if int(self.task["application"]["gpu_count"]) < 0:
             raise KeeperError("GPU count cannot be negative")
         ports = [int(value) for value in self.base["dnat"].get("external_port_candidates", [])]
-        if self.base['dnat'].get('enabled') and not ports:
+        if self.base["dnat"].get("enabled") and not ports:
             raise KeeperError("at least one DNAT external port candidate is required")
 
     @property
@@ -199,11 +203,6 @@ class SCOClient:
 
     def eip_command(self, *args: str) -> list[str]:
         return [*self.sco_global(), "eip", *args]
-
-    def get_free_gpus(self) -> int:
-        cluster = str(self.task["application"]["cluster"])
-        result = self.runner.run([*self.sco_global(), "aec2", "clusters", "usage", "--name", cluster])
-        return parse_reserved_idle_gpus(result.stdout)
 
     def get_app(self) -> AppStatus:
         result = self.runner.run(
@@ -281,30 +280,15 @@ class SCOClient:
             ),
             mutate=True,
         )
-        if not self.runner.dry_run:
-            self.state.update(run_started_at=time.time(), last_action="create", cooldown_until=0)
 
     def start_app(self) -> None:
         self.runner.run(self.cci_command("start", self.app_name), mutate=True)
-        if not self.runner.dry_run:
-            self.state.update(run_started_at=time.time(), last_action="start", cooldown_until=0)
 
-    def stop_app(self, reason: str, free_gpus: int, cooldown_seconds: int = 30) -> None:
+    def stop_app(self) -> None:
         self.runner.run(self.cci_command("stop", self.app_name), mutate=True)
-        if not self.runner.dry_run:
-            self.state.update(
-                last_action="stop",
-                last_stop_reason=reason,
-                stopped_at=time.time(),
-                cooldown_until=time.time() + cooldown_seconds,
-                run_started_at=0,
-                pre_stop_free_gpus=free_gpus,
-            )
 
     def delete_app(self) -> None:
         self.runner.run(self.cci_command("delete", self.app_name), mutate=True)
-        if not self.runner.dry_run:
-            self.state.update(last_action="delete", run_started_at=0, cooldown_until=0)
 
     def get_eip(self) -> dict[str, Any]:
         result = self.runner.run(
@@ -453,6 +437,7 @@ class SCOClient:
             ),
             mutate=True,
         )
+
 
 def configure_logging(verbose: bool = False, console: bool | None = None) -> None:
     DEFAULT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,23 @@
+# ACP 独立工作环境；不使用 CCI 周期续杯策略。
+version: 1
+workspace: share-space
+# 仅查询并管理当前账号的任务。
+user_id: 01a04299-f861-7da3-a01f-2647a9155735
+cluster: computing-cluster-01g-02
+# 固定 1 个 Worker，4 GPU、56 vCPU、792 GiB。
+worker_spec: N6lS.Iu.I10.4.56c792g
+image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-10-29:oneday-container-20261029092409
+mount: 01a04263-91e5-7603-bc01-c67e503da6b5:/data
+# 128 卡时额度按 4 卡估算上限 32 小时；最多设置 30 小时，预留初始化余量。
+hours: 30
+poll_seconds: 30
+ready_timeout_minutes: 120
+# 开启后正常结束或外部停止可创建新任务；失败或人工停止保持暂停。
+auto_restart: false
+schedule:
+  start:
+    enabled: false
+    time: '08:00'
+  stop:
+    enabled: false
+    time: '23:00'

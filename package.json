@@ -1,0 +1,14 @@
+{
+  "name": "oneday-compute-console",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write static/*.js static/*.css templates/*.html tests/*.cjs",
+    "format:check": "prettier --check static/*.js static/*.css templates/*.html tests/*.cjs",
+    "test": "node tests/console-render.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "devDependencies": {
+    "prettier": "3.5.3",
+    "playwright-core": "1.63.0"
+  }
+}

@@ -27,7 +27,7 @@ instances:
     # 内存容量，带单位，例如128GiB。
     memory: 128GiB
   # 完整镜像地址；实例编辑保存后下一次启动应用。
-  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-09-21:oneday-container-20260921060318
+  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-10-29:oneday-container-20261029092409
   # 每日定时；停止时段优先于周期续杯。
   schedule:
     # 每日启动规则。
@@ -35,13 +35,13 @@ instances:
       # 是否启用当前功能。
       enabled: true
       # 每日执行时间，24小时HH:MM格式。
-      time: 09:00
+      time: 08:00
     # 每日停止规则。
     stop:
       # 是否启用当前功能。
-      enabled: false
+      enabled: true
       # 每日执行时间，24小时HH:MM格式。
-      time: 00:00
+      time: 04:00
   # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
   rollover:
     # 是否启用当前功能。
@@ -71,28 +71,46 @@ instances:
     - dnat-zhicheng-e65208ef
     # CCI应用必须使用CCI_DEPLOYMENT_SERVICE。
     internal_instance_type: CCI_DEPLOYMENT_SERVICE
+  # 启动或重启等待Running / Ready的最长时间（1–180分钟）；未设置时默认为60分钟。
+  start_timeout_minutes: 120
+  # 启动命令参数列表；实例配置优先，镜像替换重建时使用。
+  command:
+  - bash
+  - -c
+  - '  bash /data/260010081/ops/cci-start.sh --hours 4
+
+    '
+  # 确认停止后自动启动；人工暂停、失败暂停和定时停止优先。
+  auto_start_on_stop: false
 # 本地唯一标识，也是状态和日志目录名称。
-- key: cci-347dfc645205
+- key: cpu
   # 平台资源名称，不是显示名称。
-  name: oneday-debug-h100
+  name: oneday-keeper-cpu
+  # 管理台显示名称。
+  display_name: OneDay-Keeper-CPU
   # 工作空间名称，与应用name共同定位已有CCI。
   workspace: share-space
-  # 管理台显示名称。
-  display_name: OneDay-debug-H100
   # 计算集群名称。
   cluster: debug-cluster
   # 实例资源信息；必须与平台规格对应。
   resources:
     # 平台资源规格名称。
-    spec: n6ls.iu.i40.1.4c64g
+    spec: n6ls.iu.i40.2c4g
     # GPU卡数，CPU实例可为0。
-    gpu_count: 1
+    gpu_count: 0
     # vCPU数量。
-    cpu: '4'
+    cpu: '2'
     # 内存容量，带单位，例如128GiB。
-    memory: 64GiB
+    memory: 4GiB
   # 完整镜像地址；实例编辑保存后下一次启动应用。
-  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-09-21:oneday-container-20260921060318
+  image: registry.cn-sh-01g.sensecore.cn/ccr-zhicheng-06/oneday-conda-10-29:oneday-container-20261029092409
+  # 启动命令参数列表；实例配置优先，镜像替换重建时使用。
+  command:
+  - bash
+  - -c
+  - '  bash /data/260010081/ops/cci-start.sh --hours 24'
+  # 确认停止后自动启动；人工暂停、失败暂停和定时停止优先。
+  auto_start_on_stop: true
   # 每日定时；停止时段优先于周期续杯。
   schedule:
     # 每日启动规则。
@@ -100,19 +118,21 @@ instances:
       # 是否启用当前功能。
       enabled: false
       # 每日执行时间，24小时HH:MM格式。
-      time: 09:00
+      time: 08:00
     # 每日停止规则。
     stop:
       # 是否启用当前功能。
       enabled: false
       # 每日执行时间，24小时HH:MM格式。
-      time: 00:00
+      time: 04:00
   # 周期续杯：到期停止，确认停止后等待5秒直接启动，不检查GPU余量。
   rollover:
     # 是否启用当前功能。
-    enabled: true
+    enabled: false
     # 续杯周期（1–230分钟）；修改后按本轮平台启动时间立即重新判断。
     period_minutes: 230
+  # 启动或重启等待Running / Ready的最长时间（1–180分钟）；未设置时默认为60分钟。
+  start_timeout_minutes: 120
   # 公网映射管理；普通启停保留绑定。
   dnat:
     # 是否启用当前功能。

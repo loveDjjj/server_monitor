@@ -11,6 +11,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -r requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m ruff check app.py sco_client.py controller tests
+      - run: python -m ruff format --check app.py sco_client.py controller tests
       - run: python -m unittest discover -s tests -v
+      - run: npm ci
+      - run: npm run format:check
       - run: node --check static/console.js
+      - run: node --check static/common.js
+      - run: node --check static/acp.js
+      - run: npm test
+      - if: matrix.python == '3.12'
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+      - if: matrix.python == '3.12'
+        run: npm run test:browser

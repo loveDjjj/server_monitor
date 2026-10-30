@@ -1,6 +1,14 @@
-# SCO CCI 实例管理台
+# OneDay 计算工作台
 
 使用一个 Python 进程管理多个 SenseCore CCI：独立查询状态、定时启停、周期续杯、人工操作和日志。GPU余量在独立线程采集，只用于图表展示，不决定实例能否启动。网页默认地址：<http://127.0.0.1:18766>。
+
+工作台包含概览、CCI、ACP、GPU余量和操作记录。实例设置在侧边抽屉编辑。ACP 使用独立的 `config/acp.yaml` 和 `controller/acp.py`，默认4 GPU、56 vCPU、792 GiB、1 Worker、单次30小时。初始自动化关闭，可在 ACP 环境设置中开启每日启动、停止和结束后自动启动，无周期续杯。
+
+CCI 页面采用实例列表与选中详情，运行中的实例通过“更多操作”菜单停止或重启；镜像与启动命令默认折叠。ACP 历史默认显示8条，可搜索及展开全部。页面使用本地内嵌 Lucide 图标（许可见 `static/LUCIDE-LICENSE.txt`），不依赖外部字体或图标CDN。
+
+ACP 启动按钮创建按日期命名的新任务，任务提交意图先写入本地，网络超时或结果不明确时暂停，禁止盲目重提。只停止本配置创建并登记的当前任务；历史任务只读。任务失败、人工停止和管理台操作中断会暂停自动启动。启动失败或超时不妨碍之后的定时停止；停止本身失败则暂停重复停止。排队和启动等待期间可以请求“取消启动并停止”，由同一操作线程处理，已提交但结果不明确时继续保留记录。失败任务的“确认失败并恢复调度”只确认当前UID的失败；如启用自动启动，会创建下一次任务，不恢复旧进程。每日停止时段优先。修改时长、镜像和集群从下一次创建生效。
+
+ACP 任务详情可查询 Worker、Pod IP、Host IP 和日志。Pod IP 是集群内网地址；已结束任务显示历史地址，不能保证可连接。CLI 当前 Worker 命令仅支持表格输出，按表头列解析并校验IP。历史按100条分页，当前受管任务独立按名称与UID查询，翻页不影响监控；任务归属或UID改变时拒绝操作。Worker查询失败会标明旧数据。日志为最长3秒的快照，保留部分输出并回收CLI进程树，10秒内复用缓存；全局CLI忙时立即提示稍后再试。GPU卡时是按4卡与脚本时长估算，非平台计费数据。
 
 仓库保留当前部署的真实配置。换机器或账号运行前，先检查 `config/` 中的可执行文件路径、Profile、订阅、Workspace、镜像和存储资源；账号凭据通过本机 `sco init` 配置，不在仓库中保存。
 
@@ -31,6 +39,9 @@ controller/
   runtime_api.py               只读CCI OpenAPI，获取平台容器运行时间
   config.py                    YAML校验与中文注释生成
   storage.py                   原子JSON快照与JSONL日志
+  acp.py                       ACP操作执行、持久状态与取消请求
+  acp_policy.py                ACP纯调度策略与配置校验
+  acp_client.py                ACP平台命令、任务归属与Worker解析
   http.py                      网页与HTTP API
 sco_client.py                  SCO CLI封装、CCI配置渲染与DNAT
 config/
@@ -40,7 +51,9 @@ config/
 sco-skill/sco-control/         供AI安装的Skill及命令参考
 docs/acp-training.md           ACP训练任务的AI接手、提交和监控手册
 templates/console.html         单页网页结构
-static/console.js              实例卡片、编辑、日志抽屉、GPU图表
+static/common.js               共用格式、图标、状态与HTTP请求
+static/console.js              CCI列表、编辑、日志抽屉与GPU图表
+static/acp.js                  ACP页面、Pod IP、日志快照与历史分页
 static/console.css             桌面与手机样式
 launchd/*.plist.example        macOS后台服务模板
 tests/                        离线测试
@@ -93,7 +106,7 @@ ACP训练任务的已验证挂载、Conda激活和PowerShell提交步骤见 [ACP
 
 ## 网页使用
 
-实例页右上角“实例数 · 采样间隔 · 编辑”可修改所有实例的状态采样间隔（10–3600秒），保存后立即生效。GPU余量采样独立设置，当前为10秒。启动和重启等待Running / Ready的上限为20分钟，期间每5秒确认状态；失败暂停机制仍然有效。
+实例页右上角“实例数 · 采样间隔 · 编辑”可修改所有实例的状态采样间隔（10–3600秒），保存后立即生效。GPU余量采样独立设置，当前为10秒。每个实例的“编辑实例设置”可分别设置启动和重启等待Running / Ready的上限（1–180分钟，旧配置默认60分钟），期间每5秒确认状态；修改从下一次启动或重启操作生效，失败暂停机制仍然有效。
 
 ### 添加已有实例
 
@@ -122,7 +135,11 @@ ACP训练任务的已验证挂载、Conda激活和PowerShell提交步骤见 [ACP
 
 各实例点击编辑后可保存或放弃，自动刷新不覆盖草稿。名称和调度参数保存后立即生效；镜像保存为待应用，下一次启动或人工重启时应用。普通stop/start保留DNAT；镜像替换可能删除并创建同名实例，程序备份配置并恢复新UID的DNAT。
 
-启动命令、AFS、Secret、端口等只在 `defaults.yaml` 配置。中文字段注释在网页保存时会重新生成。
+启动命令可在 `instances.yaml` 为每个实例设置 `command`，优先于 `defaults.yaml` 的默认命令；添加已有实例会读取平台命令。AFS、Secret、端口仍在 `defaults.yaml` 配置。命令用于镜像替换重建，普通启停沿用平台已有命令；仅修改本地命令不会更新现有云端容器。中文字段注释在网页保存时会重新生成。
+
+运行时间区域的“停止后自动启动”开关按实例保存，保存后立即生效。平台确认 STOPPED / SUSPENDED 后触发启动，过渡状态和查询失败时等待；人工暂停、操作失败暂停和定时停止优先。开关不会清除暂停或重置运行时间，也不会禁用定时、周期续杯功能。自动启动使用独立日志来源，可通过“恢复自动运行”解除暂停。
+
+当前登记为 `oneday-keeper-h100` 和 `oneday-keeper-cpu`；已删除的 debug 实例退出监控，历史日志保留。CPU 初始开启停止后自动启动，定时与周期续杯关闭但仍可编辑；H100 保留原调度。两者分别使用 `/data/260010081/ops/cci-start.sh --hours 4` 和 `--hours 24`。CPU 暂不接管 DNAT，普通启停保留平台映射；更换镜像重建前需核对并配置 CPU 独立公网绑定。自动调度依赖本机管理台持续运行和联网。
 
 ### 日志和进度
 
@@ -136,6 +153,10 @@ runtime/gpu/<cluster-key>/metrics.jsonl
 ```
 
 操作阶段包括排队、停止提交、等待停止、5秒等待、启动提交、等待Ready及最终结果。平台拒绝或超时会显示错误。管理进程重启会把未结束操作标记为中断，重新查询平台；不会把命令已提交当成操作完成。
+
+等待启动就绪时，单次SCO只读状态查询超时会记录为 `source=monitor` 的事件，最多连续重试3次；成功恢复也写入事件日志。启停命令不会自动重发，连续查询失败仍会暂停自动操作。`source=platform` 事件仅在观测到实例状态、Ready数或UID变化时记录前后值、观测时间、平台 `update_time` 和可能关联的本地操作；运行中主容器的启动时间或重启次数变化也单独记录。用网页“日志”或 `GET /api/instances/<key>/events` 查看。平台时间是应用更新时间，不一定等于停机时间；无本地操作不代表知道是谁停机，准确原因仍需平台事件/审计记录确认。停止状态显示“已停止”，历史失败操作不会当成当前运行状态。
+
+离线验证：`python -m unittest discover -s tests -v`、`node --check static/console.js`、`node tests/console-render.cjs`。这些测试不会启停真实CCI。
 
 ## macOS launchd
 
@@ -176,4 +197,6 @@ git diff --check
 
 ## 提交范围
 
-按项目约定提交实际 `config/*.yaml` 和 `sco-skill/`。不提交SCO密钥、`.env`、日志、运行状态、备份、虚拟环境和Python缓存。`.github/workflows/check.yml` 会运行离线测试和JavaScript语法检查。上传前执行 `git status --short`，核对新增文件和删除文件后再提交。
+按项目约定提交实际 `config/*.yaml` 和 `sco-skill/`。不提交SCO密钥、`.env`、日志、运行状态、备份、虚拟环境和缓存。`.github/workflows/check.yml` 检查格式、静态问题、离线测试、前端语法和模拟浏览器流程。测试使用独立fixture，不读取真实部署设置，也不提交或停止云端任务。
+
+开发检查：安装 `requirements-dev.txt`，执行 `npm ci`；运行 `python -m ruff check app.py sco_client.py controller tests`、`python -m ruff format --check app.py sco_client.py controller tests`、`python -m unittest discover -s tests -v`、`npm run format:check`、`npm test`、`npm run test:browser`。Windows浏览器测试使用Edge；Linux先运行 `node node_modules/playwright-core/cli.js install --with-deps chromium`。Ruff和Prettier版本固定，浏览器测试使用内存API数据，截图保存在系统临时目录。
